@@ -20,12 +20,19 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
 
     bytes32 private constant KDF_MESSAGE_TYPEHASH = keccak256("KDF(address zkMultisigAddress)");
 
-    string private constant EIP712_NAME = "ZKMultisigFactory";
-    string private constant EIP712_VERSION = "1";
-
+    address private _participantVerifier;
     address private immutable _zkMulsigImplementation;
 
-    constructor(address zkMultisigImplementation_) EIP712(EIP712_NAME, EIP712_VERSION) {
+    constructor(
+        address zkMultisigImplementation_,
+        address participantVerifier_
+    ) EIP712("ZKMultisigFactory", "1") {
+        require(
+            zkMultisigImplementation_ != address(0) && participantVerifier_ != address(0),
+            "ZKMultisigFactory: Invalid implementation or verifier address"
+        );
+
+        _participantVerifier = participantVerifier_;
         _zkMulsigImplementation = zkMultisigImplementation_;
     }
 
@@ -41,7 +48,11 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
             )
         );
 
-        IZKMultisig(zkMultisigAddress_).initialize(participants_, quorumPercentage_);
+        IZKMultisig(zkMultisigAddress_).initialize(
+            participants_,
+            quorumPercentage_,
+            _participantVerifier
+        );
 
         _zkMultisigs.add(zkMultisigAddress_);
 

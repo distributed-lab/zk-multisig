@@ -39,7 +39,11 @@ interface IZKMultisig {
 
     event ProposalExecuted(uint256 indexed proposalId);
 
-    function initialize(uint256[] memory participants_, uint256 quorumPercentage_) external;
+    function initialize(
+        uint256[] memory participants_,
+        uint256 quorumPercentage_,
+        address participantVerifier_
+    ) external;
 
     function addParticipants(uint256[] calldata participantsToAdd) external;
 
@@ -56,7 +60,7 @@ interface IZKMultisig {
 
     function vote(uint256 proposalId, ZKParams calldata proofData) external;
 
-    function execute(uint256 proposalId) external;
+    function execute(uint256 proposalId) external payable;
 
     function getParticipantsSMTRoot() external view returns (bytes32);
 
