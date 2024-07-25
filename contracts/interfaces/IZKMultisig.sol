@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {SparseMerkleTree} from "@solarity/solidity-lib/libs/data-structures/SparseMerkleTree.sol";
 
 interface IZKMultisig {
@@ -23,6 +24,13 @@ interface IZKMultisig {
         address target;
         uint256 value;
         bytes data;
+    }
+
+    struct ProposalData {
+        ProposalContent content;
+        uint256 proposalEndTime;
+        EnumerableSet.UintSet blinders;
+        bool executed;
     }
 
     struct ProposalInfoView {
@@ -70,7 +78,7 @@ interface IZKMultisig {
 
     function getParticipantsCount() external view returns (uint256);
 
-    function getParticipants() external view returns (bytes32[] memory);
+    function getParticipants() external view returns (uint256[] memory);
 
     function getProposalsCount() external view returns (uint256);
 

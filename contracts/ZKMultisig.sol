@@ -17,29 +17,20 @@ import {IZKMultisig} from "./interfaces/IZKMultisig.sol";
 import {PoseidonUnit1L} from "./libs/Poseidon.sol";
 
 contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
-    using SparseMerkleTree for SparseMerkleTree.Bytes32SMT;
-    using EnumerableSet for EnumerableSet.Bytes32Set;
-    using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for *;
     using Paginator for EnumerableSet.UintSet;
+    using SparseMerkleTree for SparseMerkleTree.UintSMT;
     using VerifierHelper for address;
     using Address for address;
     using Math for uint256;
 
-    struct ProposalData {
-        ProposalContent content;
-        uint256 proposalEndTime;
-        EnumerableSet.UintSet blinders;
-        uint256 requiredQuorum;
-        bool executed;
-    }
-
     uint256 public constant PARTICIPANTS_TREE_DEPTH = 20;
     uint256 public constant MIN_QUORUM_SIZE = 1;
 
-    address public _participantVerifier;
+    address public participantVerifier;
 
-    SparseMerkleTree.Bytes32SMT internal _participantsSMTTree;
-    EnumerableSet.Bytes32Set internal _participants;
+    SparseMerkleTree.UintSMT internal _participantsSMT;
+    EnumerableSet.UintSet internal _participants;
     EnumerableSet.UintSet internal _proposalIds;
 
     uint256 private _quorumPercentage;
@@ -60,13 +51,11 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         uint256 quorumPercentage_,
         address participantVerifier_
     ) external initializer {
-        require(participantVerifier_ != address(0), "ZKMultisig: Invalid verifier address");
+        _participantsSMT.initialize(uint32(PARTICIPANTS_TREE_DEPTH));
 
+        _updateParticipantVerifier(participantVerifier_);
         _updateQourumPercentage(quorumPercentage_);
-        _participantsSMTTree.initialize(uint32(PARTICIPANTS_TREE_DEPTH));
         _addParticipants(participants_);
-
-        _participantVerifier = participantVerifier_;
     }
 
     function addParticipants(uint256[] calldata participantsToAdd_) external onlyThis {
@@ -81,6 +70,10 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         _updateQourumPercentage(newQuorumPercentage_);
     }
 
+    function updateParticipantVerifier(address participantVerifier_) external onlyThis {
+        _updateParticipantVerifier(participantVerifier_);
+    }
+
     function create(
         ProposalContent calldata content_,
         uint256 duration_,
@@ -91,12 +84,11 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         require(duration_ > 0, "ZKMultisig: Invalid duration");
         require(content_.target != address(0), "ZKMultisig: Invalid target");
 
-        uint256 proposalId_ = _computeProposalId(content_, salt_);
+        uint256 proposalId_ = computeProposalId(content_, salt_);
 
         // validate proposal state
         require(
-            !_proposalIds.contains(proposalId_) &&
-                _getProposalStatus(proposalId_) == ProposalStatus.NONE,
+            getProposalStatus(proposalId_) == ProposalStatus.NONE,
             "ZKMultisig: Proposal already exists"
         );
 
@@ -108,16 +100,14 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
 
         _proposal.content = content_;
         _proposal.proposalEndTime = block.timestamp + duration_;
-        _proposal.requiredQuorum = ((_participants.length() * _quorumPercentage) / PERCENTAGE_100)
-            .max(MIN_QUORUM_SIZE);
 
         require(
-            _getProposalStatus(proposalId_) == ProposalStatus.VOTING,
+            getProposalStatus(proposalId_) == ProposalStatus.VOTING,
             "ZKMultisig: Incorrect proposal voting state after creation"
         );
 
         // vote on behalf of the creator
-        _vote(proposalId_, proofData_.inputs[0]);
+        _proposal.blinders.add(proofData_.inputs[0]);
 
         emit ProposalCreated(proposalId_, content_);
 
@@ -126,20 +116,21 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
 
     function vote(uint256 proposalId_, ZKParams calldata proofData_) external {
         require(
-            _getProposalStatus(proposalId_) == ProposalStatus.VOTING,
+            getProposalStatus(proposalId_) == ProposalStatus.VOTING,
             "ZKMultisig: Proposal is not in voting state"
         );
 
         _validateZKParams(proposalId_, proofData_);
 
-        _vote(proposalId_, proofData_.inputs[0]);
+        ProposalData storage _proposal = _proposals[proposalId_];
+        _proposal.blinders.add(proofData_.inputs[0]);
 
         emit ProposalVoted(proposalId_, proofData_.inputs[0]);
     }
 
     function execute(uint256 proposalId_) external payable {
         require(
-            _getProposalStatus(proposalId_) == ProposalStatus.ACCEPTED,
+            getProposalStatus(proposalId_) == ProposalStatus.ACCEPTED,
             "ZKMultisig: Proposal is not accepted"
         );
 
@@ -158,20 +149,20 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
     }
 
     function getParticipantsSMTRoot() external view returns (bytes32) {
-        return _participantsSMTTree.getRoot();
+        return _participantsSMT.getRoot();
     }
 
     function getParticipantsSMTProof(
         bytes32 publicKeyHash_
     ) external view override returns (SparseMerkleTree.Proof memory) {
-        return _participantsSMTTree.getProof(publicKeyHash_);
+        return _participantsSMT.getProof(publicKeyHash_);
     }
 
     function getParticipantsCount() external view returns (uint256) {
         return _participants.length();
     }
 
-    function getParticipants() external view returns (bytes32[] memory) {
+    function getParticipants() external view returns (uint256[] memory) {
         return _participants.values();
     }
 
@@ -197,32 +188,67 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
             ProposalInfoView({
                 content: _proposal.content,
                 proposalEndTime: _proposal.proposalEndTime,
-                status: _getProposalStatus(proposalId_),
+                status: getProposalStatus(proposalId_),
                 votesCount: _proposal.blinders.length(),
-                requiredQuorum: _proposal.requiredQuorum
+                requiredQuorum: getRequiredQuorum()
             });
-    }
-
-    function getProposalStatus(uint256 proposalId_) external view returns (ProposalStatus) {
-        return _getProposalStatus(proposalId_);
-    }
-
-    function getProposalChallenge(uint256 proposalId_) external view returns (uint256) {
-        return _getProposalChallenge(proposalId_);
     }
 
     function computeProposalId(
         ProposalContent calldata content_,
         uint256 salt_
-    ) external pure returns (uint256) {
-        return _computeProposalId(content_, salt_);
+    ) public pure returns (uint256) {
+        return
+            uint256(keccak256(abi.encode(content_.target, content_.value, content_.data, salt_)));
+    }
+
+    function getProposalChallenge(uint256 proposalId_) public view returns (uint256) {
+        return
+            uint256(
+                PoseidonUnit1L.poseidon(
+                    [uint256(keccak256(abi.encode(block.chainid, address(this), proposalId_)))]
+                )
+            );
     }
 
     function isBlinderVoted(
         uint256 proposalId_,
         uint256 blinderToCheck_
-    ) external view returns (bool) {
-        return _isBlinderVoted(proposalId_, blinderToCheck_);
+    ) public view returns (bool) {
+        return _proposals[proposalId_].blinders.contains(blinderToCheck_);
+    }
+
+    function getProposalStatus(uint256 proposalId_) public view returns (ProposalStatus) {
+        ProposalData storage _proposal = _proposals[proposalId_];
+
+        // Check if the proposal exists by verifying the end time
+        if (_proposal.proposalEndTime == 0) {
+            return ProposalStatus.NONE;
+        }
+
+        // Check if the proposal has been executed
+        if (_proposal.executed) {
+            return ProposalStatus.EXECUTED;
+        }
+
+        // Check if the proposal has met the quorum requirement
+        if (_proposal.blinders.length() >= getRequiredQuorum()) {
+            return ProposalStatus.ACCEPTED;
+        }
+
+        // Check if the proposal is still within the voting period
+        if (_proposal.proposalEndTime > block.timestamp) {
+            return ProposalStatus.VOTING;
+        }
+
+        // If the proposal has not met the quorum and the voting period has expired
+        return ProposalStatus.EXPIRED;
+    }
+
+    // return the required quorum amount (not percentage) for a given number of participants
+    function getRequiredQuorum() public view returns (uint256) {
+        return
+            ((_participants.length() * _quorumPercentage) / PERCENTAGE_100).max(MIN_QUORUM_SIZE);
     }
 
     function _authorizeUpgrade(address newImplementation_) internal override onlyThis {}
@@ -253,32 +279,32 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         _quorumPercentage = newQuorumPercentage_;
     }
 
-    // internal vote skipping validation
-    function _vote(uint256 proposalId_, uint256 blinder_) internal {
-        ProposalData storage _proposal = _proposals[proposalId_];
-        _proposal.blinders.add(blinder_);
+    function _updateParticipantVerifier(address participantVerifier_) internal {
+        require(participantVerifier_ != address(0), "ZKMultisig: Invalid verifier address");
+
+        participantVerifier = participantVerifier_;
     }
 
     function _validateZKParams(uint256 proposalId_, ZKParams calldata proofData_) internal view {
         require(proofData_.inputs.length == 3, "ZKMultisig: Invalid proof data");
 
         require(
-            !_isBlinderVoted(proposalId_, proofData_.inputs[0]),
+            !isBlinderVoted(proposalId_, proofData_.inputs[0]),
             "ZKMultisig: Blinder already voted"
         );
 
         require(
-            proofData_.inputs[1] == _getProposalChallenge(proposalId_),
+            proofData_.inputs[1] == getProposalChallenge(proposalId_),
             "ZKMultisig: Invalid challenge"
         );
 
         require(
-            proofData_.inputs[2] == uint256(_participantsSMTTree.getRoot()),
+            proofData_.inputs[2] == uint256(_participantsSMT.getRoot()),
             "ZKMultisig: Invalid SMT root"
         );
 
         require(
-            _participantVerifier.verifyProof(
+            participantVerifier.verifyProof(
                 proofData_.inputs,
                 VerifierHelper.ProofPoints({a: proofData_.a, b: proofData_.b, c: proofData_.c})
             ),
@@ -286,72 +312,20 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         );
     }
 
-    function _getProposalStatus(uint256 proposalId_) internal view returns (ProposalStatus) {
-        ProposalData storage _proposal = _proposals[proposalId_];
-
-        // Check if the proposal exists by verifying the end time
-        if (_proposal.proposalEndTime == 0) {
-            return ProposalStatus.NONE;
-        }
-
-        // Check if the proposal has been executed
-        if (_proposal.executed) {
-            return ProposalStatus.EXECUTED;
-        }
-
-        // Check if the proposal has met the quorum requirement
-        if (_proposal.blinders.length() >= _proposal.requiredQuorum) {
-            return ProposalStatus.ACCEPTED;
-        }
-
-        // Check if the proposal is still within the voting period
-        if (_proposal.proposalEndTime > block.timestamp) {
-            return ProposalStatus.VOTING;
-        }
-
-        // If the proposal has not met the quorum and the voting period has expired
-        return ProposalStatus.EXPIRED;
-    }
-
-    function _getProposalChallenge(uint256 proposalId_) internal view returns (uint256) {
-        return
-            uint256(
-                PoseidonUnit1L.poseidon(
-                    [uint256(keccak256(abi.encode(block.chainid, address(this), proposalId_)))]
-                )
-            );
-    }
-
-    function _computeProposalId(
-        ProposalContent calldata content_,
-        uint256 salt_
-    ) internal pure returns (uint256) {
-        return
-            uint256(keccak256(abi.encode(content_.target, content_.value, content_.data, salt_)));
-    }
-
-    function _isBlinderVoted(
-        uint256 proposalId_,
-        uint256 blinderToCheck_
-    ) internal view returns (bool) {
-        return _proposals[proposalId_].blinders.contains(blinderToCheck_);
-    }
-
     function _processParticipants(uint256[] memory participants_, bool isAdding_) private {
         require(participants_.length > 0, "Multisig: No participants to process");
 
         for (uint256 i = 0; i < participants_.length; i++) {
-            bytes32 participant_ = bytes32(participants_[i]);
-            bytes32 participantKey_ = keccak256(abi.encodePacked(participant_));
+            uint256 participant_ = participants_[i];
 
             if (isAdding_) {
                 if (!_participants.contains(participant_)) {
-                    _participantsSMTTree.add(participantKey_, participant_);
+                    _participantsSMT.add(bytes32(participant_), participant_);
                     _participants.add(participant_);
                 }
             } else {
                 if (_participants.contains(participant_)) {
-                    _participantsSMTTree.remove(participantKey_);
+                    _participantsSMT.remove(bytes32(participant_));
                     _participants.remove(participant_);
                 }
             }

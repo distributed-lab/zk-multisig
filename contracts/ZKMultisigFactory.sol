@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {IZKMultisigFactory} from "./interfaces/IZKMultisigFactory.sol";
-import {IZKMultisig} from "./interfaces/IZKMultisig.sol";
-
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
-
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {Paginator} from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
+
+import {IZKMultisigFactory} from "./interfaces/IZKMultisigFactory.sol";
+import {IZKMultisig} from "./interfaces/IZKMultisig.sol";
 
 contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Paginator for EnumerableSet.AddressSet;
 
-    EnumerableSet.AddressSet private _zkMultisigs;
-
     bytes32 private constant KDF_MESSAGE_TYPEHASH = keccak256("KDF(address zkMultisigAddress)");
 
-    address private _participantVerifier;
-    address private immutable _zkMulsigImplementation;
+    EnumerableSet.AddressSet private _zkMultisigs;
+
+    address public immutable PARTICIPANT_VERIFIER;
+    address public immutable ZK_MULTISIG_IMPL;
 
     constructor(
         address zkMultisigImplementation_,
@@ -32,8 +31,8 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
             "ZKMultisigFactory: Invalid implementation or verifier address"
         );
 
-        _participantVerifier = participantVerifier_;
-        _zkMulsigImplementation = zkMultisigImplementation_;
+        PARTICIPANT_VERIFIER = participantVerifier_;
+        ZK_MULTISIG_IMPL = zkMultisigImplementation_;
     }
 
     function createMultisig(
@@ -42,16 +41,13 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
         uint256 salt_
     ) external returns (address) {
         address zkMultisigAddress_ = address(
-            new ERC1967Proxy{salt: keccak256(abi.encode(msg.sender, salt_))}(
-                _zkMulsigImplementation,
-                ""
-            )
+            new ERC1967Proxy{salt: keccak256(abi.encode(msg.sender, salt_))}(ZK_MULTISIG_IMPL, "")
         );
 
         IZKMultisig(zkMultisigAddress_).initialize(
             participants_,
             quorumPercentage_,
-            _participantVerifier
+            PARTICIPANT_VERIFIER
         );
 
         _zkMultisigs.add(zkMultisigAddress_);
@@ -69,10 +65,7 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
             Create2.computeAddress(
                 keccak256(abi.encode(deployer_, salt_)),
                 keccak256(
-                    abi.encodePacked(
-                        type(ERC1967Proxy).creationCode,
-                        abi.encode(_zkMulsigImplementation)
-                    )
+                    abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(ZK_MULTISIG_IMPL))
                 )
             );
     }
