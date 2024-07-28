@@ -54,7 +54,7 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         _participantsSMT.initialize(uint32(PARTICIPANTS_TREE_DEPTH));
 
         _updateParticipantVerifier(participantVerifier_);
-        _updateQourumPercentage(quorumPercentage_);
+        _updateQuorumPercentage(quorumPercentage_);
         _addParticipants(participants_);
     }
 
@@ -67,7 +67,7 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
     }
 
     function updateQuorumPercentage(uint256 newQuorumPercentage_) external onlyThis {
-        _updateQourumPercentage(newQuorumPercentage_);
+        _updateQuorumPercentage(newQuorumPercentage_);
     }
 
     function updateParticipantVerifier(address participantVerifier_) external onlyThis {
@@ -268,7 +268,7 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         require(_participants.length() > 0, "ZKMultisig: Cannot remove all participants");
     }
 
-    function _updateQourumPercentage(uint256 newQuorumPercentage_) internal {
+    function _updateQuorumPercentage(uint256 newQuorumPercentage_) internal {
         require(
             newQuorumPercentage_ > 0 &&
                 newQuorumPercentage_ <= PERCENTAGE_100 &&
