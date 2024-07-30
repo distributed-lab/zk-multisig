@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 interface IZKMultisigFactory {
-    event ZKMutlisigCreated(
+    event ZKMultisigCreated(
         address indexed zkMultisigAddress,
         uint256[] initialParticipants,
         uint256 initialQuorumPercentage

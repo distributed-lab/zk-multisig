@@ -15,12 +15,12 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Paginator for EnumerableSet.AddressSet;
 
-    bytes32 private constant KDF_MESSAGE_TYPEHASH = keccak256("KDF(address zkMultisigAddress)");
-
-    EnumerableSet.AddressSet private _zkMultisigs;
+    bytes32 public constant KDF_MESSAGE_TYPEHASH = keccak256("KDF(address zkMultisigAddress)");
 
     address public immutable PARTICIPANT_VERIFIER;
     address public immutable ZK_MULTISIG_IMPL;
+
+    EnumerableSet.AddressSet private _zkMultisigs;
 
     constructor(
         address zkMultisigImplementation_,
@@ -52,7 +52,7 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
 
         _zkMultisigs.add(zkMultisigAddress_);
 
-        emit ZKMutlisigCreated(zkMultisigAddress_, participants_, quorumPercentage_);
+        emit ZKMultisigCreated(zkMultisigAddress_, participants_, quorumPercentage_);
 
         return zkMultisigAddress_;
     }
@@ -65,7 +65,10 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
             Create2.computeAddress(
                 keccak256(abi.encode(deployer_, salt_)),
                 keccak256(
-                    abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(ZK_MULTISIG_IMPL))
+                    abi.encodePacked(
+                        type(ERC1967Proxy).creationCode,
+                        abi.encode(ZK_MULTISIG_IMPL, "")
+                    )
                 )
             );
     }
