@@ -38,7 +38,7 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
     mapping(uint256 => ProposalData) private _proposals;
 
     modifier onlyThis() {
-        require(msg.sender == address(this), "ZKMultisig: Not authorized call");
+        _validateMsgSender();
         _;
     }
 
@@ -92,22 +92,16 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
             "ZKMultisig: Proposal already exists"
         );
 
-        // validate zk params
-        _validateZKParams(proposalId_, proofData_);
-
+        // create proposal
         ProposalData storage _proposal = _proposals[proposalId_];
         _proposalIds.add(proposalId_);
 
         _proposal.content = content_;
         _proposal.proposalEndTime = block.timestamp + duration_;
 
-        require(
-            getProposalStatus(proposalId_) == ProposalStatus.VOTING,
-            "ZKMultisig: Incorrect proposal voting state after creation"
-        );
-
         // vote on behalf of the creator
-        _proposal.blinders.add(proofData_.inputs[0]);
+        // zk validation is processed inside _vote
+        _vote(proposalId_, proofData_);
 
         emit ProposalCreated(proposalId_, content_);
 
@@ -115,17 +109,7 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
     }
 
     function vote(uint256 proposalId_, ZKParams calldata proofData_) external {
-        require(
-            getProposalStatus(proposalId_) == ProposalStatus.VOTING,
-            "ZKMultisig: Proposal is not in voting state"
-        );
-
-        _validateZKParams(proposalId_, proofData_);
-
-        ProposalData storage _proposal = _proposals[proposalId_];
-        _proposal.blinders.add(proofData_.inputs[0]);
-
-        emit ProposalVoted(proposalId_, proofData_.inputs[0]);
+        _vote(proposalId_, proofData_);
     }
 
     function execute(uint256 proposalId_) external payable {
@@ -285,6 +269,19 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         participantVerifier = participantVerifier_;
     }
 
+    function _vote(uint256 proposalId_, ZKParams calldata proofData_) internal {
+        require(
+            getProposalStatus(proposalId_) == ProposalStatus.VOTING,
+            "ZKMultisig: Proposal is not in voting state"
+        );
+
+        _validateZKParams(proposalId_, proofData_);
+
+        _proposals[proposalId_].blinders.add(proofData_.inputs[0]);
+
+        emit ProposalVoted(proposalId_, proofData_.inputs[0]);
+    }
+
     function _validateZKParams(uint256 proposalId_, ZKParams calldata proofData_) internal view {
         require(proofData_.inputs.length == 3, "ZKMultisig: Invalid proof data");
 
@@ -330,5 +327,9 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
                 }
             }
         }
+    }
+
+    function _validateMsgSender() private view {
+        require(msg.sender == address(this), "ZKMultisig: Not authorized call");
     }
 }
