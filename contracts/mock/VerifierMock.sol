@@ -6,7 +6,7 @@ contract PositiveVerifierMock {
         uint256[2] calldata,
         uint256[2][2] calldata,
         uint256[2] calldata,
-        uint256[24] calldata
+        uint256[3] calldata
     ) public pure returns (bool) {
         return true;
     }
@@ -17,7 +17,7 @@ contract NegativeVerifierMock {
         uint256[2] calldata,
         uint256[2][2] calldata,
         uint256[2] calldata,
-        uint256[24] calldata
+        uint256[3] calldata
     ) public pure returns (bool) {
         return false;
     }

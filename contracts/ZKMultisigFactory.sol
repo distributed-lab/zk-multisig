@@ -27,7 +27,10 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
         address participantVerifier_
     ) EIP712("ZKMultisigFactory", "1") {
         require(
-            zkMultisigImplementation_ != address(0) && participantVerifier_ != address(0),
+            zkMultisigImplementation_ != address(0) &&
+                zkMultisigImplementation_.code.length > 0 &&
+                participantVerifier_ != address(0) &&
+                participantVerifier_.code.length > 0,
             "ZKMultisigFactory: Invalid implementation or verifier address"
         );
 
@@ -43,7 +46,6 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
         address zkMultisigAddress_ = address(
             new ERC1967Proxy{salt: keccak256(abi.encode(msg.sender, salt_))}(ZK_MULTISIG_IMPL, "")
         );
-
         IZKMultisig(zkMultisigAddress_).initialize(
             participants_,
             quorumPercentage_,

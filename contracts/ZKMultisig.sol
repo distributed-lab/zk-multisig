@@ -190,7 +190,17 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
         return
             uint256(
                 PoseidonUnit1L.poseidon(
-                    [uint256(keccak256(abi.encode(block.chainid, address(this), proposalId_)))]
+                    [
+                        uint256(
+                            uint248(
+                                uint256(
+                                    keccak256(
+                                        abi.encode(block.chainid, address(this), proposalId_)
+                                    )
+                                )
+                            )
+                        )
+                    ]
                 )
             );
     }
@@ -265,6 +275,11 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
 
     function _updateParticipantVerifier(address participantVerifier_) internal {
         require(participantVerifier_ != address(0), "ZKMultisig: Invalid verifier address");
+        require(
+            participantVerifier_ != participantVerifier,
+            "ZKMultisig: The same verifier address"
+        );
+        require(participantVerifier_.code.length > 0, "ZKMultisig: Not a contract");
 
         participantVerifier = participantVerifier_;
     }
