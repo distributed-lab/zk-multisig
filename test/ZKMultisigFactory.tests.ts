@@ -32,12 +32,12 @@ describe("ZKMultisig Factory", () => {
   before(async () => {
     [alice] = await ethers.getSigners();
 
-    var verifier__factory = await ethers.getContractFactory("PositiveVerifierMock");
+    const verifier__factory = await ethers.getContractFactory("PositiveVerifierMock");
     participantVerifier = await verifier__factory.deploy();
 
     await participantVerifier.waitForDeployment();
 
-    var zkMultisig__factory = await ethers.getContractFactory("ZKMultisig", {
+    const zkMultisig__factory = await ethers.getContractFactory("ZKMultisig", {
       libraries: {
         PoseidonUnit1L: await (await getPoseidon(1)).getAddress(),
       },
@@ -46,7 +46,7 @@ describe("ZKMultisig Factory", () => {
 
     await zkMultisig.waitForDeployment();
 
-    var zkMultisigFactory__factory = await ethers.getContractFactory("ZKMultisigFactory");
+    const zkMultisigFactory__factory = await ethers.getContractFactory("ZKMultisigFactory");
     zkMultisigFactory = await zkMultisigFactory__factory.deploy(
       await zkMultisig.getAddress(),
       await participantVerifier.getAddress(),

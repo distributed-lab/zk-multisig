@@ -27,10 +27,7 @@ contract ZKMultisigFactory is EIP712, IZKMultisigFactory {
         address participantVerifier_
     ) EIP712("ZKMultisigFactory", "1") {
         require(
-            zkMultisigImplementation_ != address(0) &&
-                zkMultisigImplementation_.code.length > 0 &&
-                participantVerifier_ != address(0) &&
-                participantVerifier_.code.length > 0,
+            zkMultisigImplementation_.code.length > 0 && participantVerifier_.code.length > 0,
             "ZKMultisigFactory: Invalid implementation or verifier address"
         );
 

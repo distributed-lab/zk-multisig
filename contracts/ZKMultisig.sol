@@ -188,20 +188,16 @@ contract ZKMultisig is UUPSUpgradeable, IZKMultisig {
 
     function getProposalChallenge(uint256 proposalId_) public view returns (uint256) {
         return
-            uint256(
-                PoseidonUnit1L.poseidon(
-                    [
-                        uint256(
-                            uint248(
-                                uint256(
-                                    keccak256(
-                                        abi.encode(block.chainid, address(this), proposalId_)
-                                    )
-                                )
+            PoseidonUnit1L.poseidon(
+                [
+                    uint256(
+                        uint248(
+                            uint256(
+                                keccak256(abi.encode(block.chainid, address(this), proposalId_))
                             )
                         )
-                    ]
-                )
+                    )
+                ]
             );
     }
 

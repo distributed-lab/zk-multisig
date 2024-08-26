@@ -82,7 +82,7 @@ describe("ZKMultisig", () => {
 
     await zkMultisigImpl.waitForDeployment();
 
-    var zkMultisigFactory__factory = await ethers.getContractFactory("ZKMultisigFactory");
+    const zkMultisigFactory__factory = await ethers.getContractFactory("ZKMultisigFactory");
     zkMultisigFactory = await zkMultisigFactory__factory.deploy(
       await zkMultisigImpl.getAddress(),
       await positiveParticipantVerifier.getAddress(),
