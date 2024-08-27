@@ -1,63 +1,18 @@
-# Hardhat template 
+# Basic Implementation of ZK Multisig Smart Contracts
 
-Template hardhat repository for ad-hoc smart contracts development.
+This project consists of a basic implementation of ZK (Zero-Knowledge) multisig smart contracts.
 
-### How to use
+The contracts are divided into two parts:
 
-The template works out of the box. To clean up the repo, you may need to delete the mock contracts, tests and migration files.
+- **ZK Multisig Factory** - Manages and deploys multisig contracts.
+- **ZK Multisig** - The implementation of the multisig contract itself.
 
-#### Compilation
+For more details, refer to the documentation: [Link to Documentation]
 
-To compile the contracts, use the next script:
+## Steps to Build the Project
 
-```bash
-npm run compile
-```
-
-#### Test
-
-To run the tests, execute the following command:
-
-```bash
-npm run test
-```
-
-Or to see the coverage, run:
-
-```bash
-npm run coverage
-```
-
-#### Local deployment
-
-To deploy the contracts locally, run the following commands (in the different terminals):
-
-```bash
-npm run private-network
-npm run deploy-localhost
-```
-
-#### Bindings
-
-The command to generate the bindings is as follows:
-
-```bash
-npm run generate-types
-```
-
-> See the full list of available commands in the `package.json` file.
-
-### Integrated plugins
-
-- Hardhat official `ethers` + `ethers-v6`
-- [`Typechain`](https://www.npmjs.com/package/@typechain/hardhat)
-- [`hardhat-migrate`](https://www.npmjs.com/package/@solarity/hardhat-migrate), [`hardhat-markup`](https://www.npmjs.com/package/@solarity/hardhat-markup), [`hardhat-gobind`](https://www.npmjs.com/package/@solarity/hardhat-gobind)
-- [`hardhat-contract-sizer`](https://www.npmjs.com/package/hardhat-contract-sizer)
-- [`hardhat-gas-reporter`](https://www.npmjs.com/package/hardhat-gas-reporter)
-- [`solidity-coverage`](https://www.npmjs.com/package/solidity-coverage)
-
-### Other niceties
-
-- The template comes with presetup `prettier` and `solhint` that lint the project via `husky` before compilation hook.
-- The `.env.example` file is provided to check what is required as ENVs
-- Preinstalled `@openzeppelin/contracts` and `@solarity/solidity-lib`
+1. Compile the contracts:
+   ```bash
+   npm run compile
+   npm run test
+   ```
